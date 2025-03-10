@@ -9,6 +9,5 @@ Built with reliability, efficiency, and ease of use in mind, this tool allows us
 ✅ Intuitive and user-friendly interface for seamless navigation  
 ✅ Quick search for pharmaceutical products and availability status  
 ✅ Efficient record-keeping to maintain an up-to-date inventory  
-✅ Ideal for pharmacies, warehouses, and professional use  
 
 🚧 Currently in development, but will be ready soon! 🚀 Stay tuned for updates!  
