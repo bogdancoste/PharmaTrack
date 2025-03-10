@@ -1,6 +1,5 @@
 #include "functions.h"
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 /*
@@ -142,26 +141,6 @@ void delete_medicine_stock(struct medicine_list* list, const int id)
 		{
 			list -> array[i].available_quantity = 0;
 		}
-	}
-}
-
-void display_medicines(const struct medicine_list* list)  
-{  
-	/**  
-	 * @brief Displays all medicines in the list.  
-	 *  
-	 * This function iterates through the medicine list and prints the details of each medicine,  
-	 * including its ID, name, concentration, and available quantity.  
-	 *  
-	 * @param list A pointer to the medicine list.  
-	 */
-
-	for (int i = 0; i < list->index; i++)
-	{
-		printf("Medicine ID: %d\n", list->array[i].id);
-		printf("Medicine Name: %s\n", list->array[i].name);
-		printf("Medicine Concentration: %.2f\n", list->array[i].concentration);
-		printf("Medicine Available Quantity: %d\n", list->array[i].available_quantity);
 	}
 }
 

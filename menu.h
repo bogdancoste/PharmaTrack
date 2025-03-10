@@ -2,6 +2,7 @@
 #define MENU_H
 
 #include "medicine.h"
+#include <stdbool.h>
 
 void options(void);
 char select_option(void);
@@ -19,5 +20,20 @@ void option_5_submenu(void);
 char select_option_5(void);
 void filter_medicines_stock_ui(const struct medicine_list* list);
 void filter_medicines_first_letter_ui(const struct medicine_list* list);
+void buffer_flush(void);
+void display_medicines_ui(const struct medicine_list* list);
+medicine read_params_create_ui(void);
+void clear_screen(void);
+void enable_ansi(void);
+static void set_full_screen(void);
+int get_screen_width(void);
+int get_screen_height(void);
+void decorative_frame(void);
+void print_menu(const int highlight);
+void enable_raw_console_mode(void);
+void hide_mouse_cursor(void);
+void update_menu(int old_highlight, const int new_highlight);
+bool key_pressed(const int virtKey);
+void display_splash_screen(void);
 
 #endif

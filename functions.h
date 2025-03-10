@@ -14,7 +14,6 @@ int add(struct medicine_list* list, struct medicine med_unit);
 void update_medicine(struct medicine_list* list, const int id, const char name[256], const float concentration);
 void delete_medicine_stock(struct medicine_list* list, const int id);
 bool check_if_existing(const struct medicine_list* list, const struct medicine med_unit);
-void display_medicines(const struct medicine_list* list);
 
 /*
  * Business logic functions.
