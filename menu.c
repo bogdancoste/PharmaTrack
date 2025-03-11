@@ -997,28 +997,64 @@ void enable_ansi(void) {
 	SetConsoleOutputCP(65001);
 }
 
-static void set_full_screen(void) {
+
+void set_full_screen() {
+	// Get handle to console window
 	HWND hwnd = GetConsoleWindow();
-	DWORD style = GetWindowLong(hwnd, GWL_STYLE);
-	style &= ~WS_OVERLAPPEDWINDOW;
-	style |= WS_POPUP;
-	SetWindowLong(hwnd, GWL_STYLE, (LONG)(style));
+	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	if (hwnd == NULL || hOut == INVALID_HANDLE_VALUE) {
+		printf("Failed to get console window handle!\n");
+		exit(1);
+	}
+
+	// Retrieve current console buffer info
+	CONSOLE_SCREEN_BUFFER_INFO scrBufferInfo;
+	GetConsoleScreenBufferInfo(hOut, &scrBufferInfo);
+
+	// Get screen width & height (in pixels)
+	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+	// Get current visible window size (in characters)
+	short winWidth = scrBufferInfo.srWindow.Right - scrBufferInfo.srWindow.Left + 1;
+	short winHeight = scrBufferInfo.srWindow.Bottom - scrBufferInfo.srWindow.Top + 1;
+
+	// Ensure buffer size matches window size exactly
+	COORD newSize;
+	newSize.X = winWidth;
+	newSize.Y = winHeight;
+
+	if (!SetConsoleScreenBufferSize(hOut, newSize)) {
+		printf("SetConsoleScreenBufferSize() failed! Error: %d\n", GetLastError());
+		exit(1);
+	}
+
+	// Set console window size to match buffer exactly
+	SMALL_RECT windowSize = { 0, 0, winWidth - 1, winHeight - 1 };
+	if (!SetConsoleWindowInfo(hOut, TRUE, &windowSize)) {
+		printf("SetConsoleWindowInfo() failed! Error: %d\n", GetLastError());
+		exit(1);
+	}
+
+	// Remove title bar and borders
+	LONG style = GetWindowLong(hwnd, GWL_STYLE);
+	style &= ~WS_OVERLAPPEDWINDOW;  // Remove window decorations
+	style |= WS_POPUP;  // Fullscreen popup mode
+	SetWindowLong(hwnd, GWL_STYLE, style);
+
+	// Maximize the console window
 	ShowWindow(hwnd, SW_MAXIMIZE);
 
-	RECT rect;
-	GetWindowRect(hwnd, &rect);
-	MoveWindow(hwnd, rect.left, rect.top,
-		rect.right - rect.left + 1,
-		rect.bottom - rect.top + 1, TRUE);
+	// Move the console window to cover the entire screen
+	MoveWindow(hwnd, 0, 0, screenWidth, screenHeight, TRUE);
 
-	HANDLE h_console = GetStdHandle(STD_OUTPUT_HANDLE);
-	CONSOLE_SCREEN_BUFFER_INFO cons_scr_buff_info;
-	GetConsoleScreenBufferInfo(h_console, &cons_scr_buff_info);
-	COORD new_size;
+	// Explicitly hide scrollbars
+	ShowScrollBar(hwnd, SB_BOTH, FALSE);
 
-	new_size.X = (int)(cons_scr_buff_info.srWindow.Right - cons_scr_buff_info.srWindow.Left + 1);
-	new_size.Y = (int)(cons_scr_buff_info.srWindow.Bottom - cons_scr_buff_info.srWindow.Top + 1);
-	SetConsoleScreenBufferSize(h_console, new_size);
+	// Ensure Windows applies UI changes properly
+	Sleep(100);
+	SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
 }
 
 int get_screen_width(void) {
