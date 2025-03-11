@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <stdlib.h>
 
-typedef enum {
+enum color_code {
 	/* Base colors */
 	base03_color,
 	base02_color,
@@ -35,7 +35,7 @@ typedef enum {
 	// You can add more, for example: underline_color, etc.
 
 	num_color_codes
-} color_code;
+};
 
 const char* color_codes[num_color_codes] = {
 	/* Base colors */
@@ -65,7 +65,20 @@ const char* color_codes[num_color_codes] = {
 	"\033[1m"               // bold_color
 };
 
-#define NUM_OPTIONS 7
+enum menu_options
+{
+	num_options = 7
+};
+
+const char* menu_options[num_options] = {
+	" Add New Medicine",
+	" Update Existing Stock",
+	" Delete Medicine Stock",
+	" Display Sorted Inventory",
+	" Filter Medicines",
+	" List All Medicines",
+	" Exit Application"
+};
 
 void buffer_flush(void)
 {
@@ -306,28 +319,107 @@ void clear_input_buffer(void)
 void display_medicines_ui(const struct medicine_list* list)
 {
 	/**
-	 * @brief Displays all medicines in the list.
+	 * @brief Displays all medicines in the list in a decorated table with padding.
 	 *
-	 * This function iterates through the medicine list and prints the details of each medicine,
-	 * including its ID, name, concentration, and available quantity.
+	 * This function iterates through the medicine list and prints the details of each medicine
+	 * in a formatted table with borders and one-space padding, including its ID, name, concentration,
+	 * and available quantity.
 	 *
 	 * @param list A pointer to the medicine list.
 	 */
 
+	 // Set console to UTF-8 for proper rendering of box-drawing characters
+	SetConsoleOutputCP(65001);
+	clear_screen();
+	printf("%s", color_codes[base03_color]);
+
+	// Define margins and calculate available width
+	const int left_margin = 5;
+	const int right_margin = 5;
+	int screen_w = get_screen_width();
+	// The table (and header frame) will span the available width:
+	int header_width = screen_w - left_margin - right_margin;
+
+	// Draw header frame with title, starting at column left_margin.
+	printf("\033[3;%dH%s╔", left_margin, color_codes[frame_color_code]);
+	for (int i = 0; i < header_width - 2; i++)
+		printf("═");
+	printf("╗\033[4;%dH║%*s║\033[5;%dH╚", left_margin, header_width - 2, "", left_margin);
+	for (int i = 0; i < header_width - 2; i++)
+		printf("═");
+	printf("╝");
+
+	// Center the title inside the header frame.
+	const char* title = "DISPLAY ALL ENTRIES";
+	int title_pad = (header_width - (int)strlen(title)) / 2;
+	printf("\033[4;%dH%s%s%s%s", left_margin + title_pad,
+		color_codes[bold_color], color_codes[cyan_color],
+		title, color_codes[base03_color]);
+	buffer_flush();
+
+	// Calculate dynamic column widths.
+	// The total inner width is the header_width minus the 2 outer borders and 3 inner dividers.
+	int total_inner_width = header_width - 5; // 2 + 3 = 5 extra characters
+	// Set proportions for the four columns:
+	int id_width = (int)(total_inner_width * 0.1); // 10% for ID
+	int name_width = (int)(total_inner_width * 0.5); // 50% for Name
+	int conc_width = (int)(total_inner_width * 0.2); // 20% for Concentration
+	int quant_width = total_inner_width - (id_width + name_width + conc_width); // Remainder for Quantity
+
+	// Table starting position is row 7, column left_margin.
+	const int table_start_line = 7;
+	printf("\033[%d;%dH", table_start_line, left_margin);
+
+	// Print the top border of the table.
+	printf("╔");
+	for (int i = 0; i < id_width; i++) printf("═");
+	printf("╦");
+	for (int i = 0; i < name_width; i++) printf("═");
+	printf("╦");
+	for (int i = 0; i < conc_width; i++) printf("═");
+	printf("╦");
+	for (int i = 0; i < quant_width; i++) printf("═");
+	printf("╗\n\033[%dG", left_margin);
+
+	// Header row with one-space padding on each side.
+	// The field width for content is (column width - 2) to account for the left/right padding.
+	printf("║ %-*s ", id_width - 2, "ID");
+	printf("│ %-*s ", name_width - 2, "Name");
+	printf("│ %-*s ", conc_width - 2, "Concentration");
+	printf("│ %-*s ║\n\033[%dG", quant_width - 2, "Qty", left_margin);
+
+	// Divider between header and data rows.
+	printf("╠");
+	for (int i = 0; i < id_width; i++) printf("═");
+	printf("╬");
+	for (int i = 0; i < name_width; i++) printf("═");
+	printf("╬");
+	for (int i = 0; i < conc_width; i++) printf("═");
+	printf("╬");
+	for (int i = 0; i < quant_width; i++) printf("═");
+	printf("╣\n\033[%dG", left_margin);
+
+	// Loop through the medicine list and print each record in a table row with padding.
 	for (int i = 0; i < list->index; i++)
 	{
-		printf("Medicine ID: %d\n", list->array[i].id);
-		buffer_flush();
-
-		printf("Medicine Name: %s\n", list->array[i].name);
-		buffer_flush();
-
-		printf("Medicine Concentration: %.2f\n", list->array[i].concentration);
-		buffer_flush();
-
-		printf("Medicine Available Quantity: %d\n", list->array[i].available_quantity);
-		buffer_flush();
+		printf("║ %-*d ", id_width - 2, list->array[i].id);
+		printf("│ %-*s ", name_width - 2, list->array[i].name);
+		printf("│ %-*.2f ", conc_width - 2, list->array[i].concentration);
+		printf("│ %-*d ║\n\033[%dG", quant_width - 2, list->array[i].available_quantity, left_margin);
 	}
+
+	// Print the bottom border of the table.
+	printf("╚");
+	for (int i = 0; i < id_width; i++) printf("═");
+	printf("╩");
+	for (int i = 0; i < name_width; i++) printf("═");
+	printf("╩");
+	for (int i = 0; i < conc_width; i++) printf("═");
+	printf("╩");
+	for (int i = 0; i < quant_width; i++) printf("═");
+	printf("╝\n");
+
+	buffer_flush();
 }
 
 medicine read_params_create_ui(void)
@@ -366,47 +458,154 @@ medicine read_params_create_ui(void)
 	char name[256];
 	float concentration;
 	int available_quantity;
+	SetConsoleOutputCP(65001);
 
-	printf("Insert the medicine ID: ");
+	clear_screen();
+	printf("%s", color_codes[base03_color]);
+
+	const int screen_w = get_screen_width();
+	const int header_width = screen_w - 4;
+	printf("\033[3;3H%s╔", color_codes[frame_color_code]);
+	for (int i = 0; i < header_width - 2; i++)
+		printf("═");
+	printf("╗\033[4;3H║%*s║\033[5;3H╚", header_width - 2, "");
+	for (int i = 0; i < header_width - 2; i++)
+		printf("═");
+	printf("╝");
+
+	const char* title = "ADD NEW MEDICINE ENTRY";
+	const int title_pad = (header_width - (int)strlen(title)) / 2;
+	printf("\033[4;%dH%s%s%s%s", 3 + title_pad,
+		color_codes[bold_color], color_codes[cyan_color],
+		title, color_codes[base03_color]);
 	buffer_flush();
 
-	while (scanf_s("%d", &id) != 1) {
-		printf("Invalid input. Please enter a valid integer value for the medicine ID: ");
+	int current_line = 7;
+	// Define input column positions (adjust as needed)
+	const int id_input_col = 25;
+	const int name_input_col = 25;
+	const int conc_input_col = 25;
+	const int quant_input_col = 25;
+
+	// --- Medicine ID ---
+	printf("\033[%d;5H%s%s > %s Medicine ID: %s", current_line,
+		color_codes[bold_color], color_codes[green_color],
+		color_codes[base0_color], color_codes[base2_color]);
+	// Position the cursor at the input area.
+	printf("\033[%d;%dH", current_line, id_input_col);
+	buffer_flush();
+
+	while (scanf_s("%d", &id) != 1)
+	{
+		// Print error message on the line below the prompt.
+		printf("\033[%d;5H%s%s Invalid ID! Please enter a valid integer: %s",
+			current_line + 1, color_codes[bold_color],
+			color_codes[red_color], color_codes[base2_color]);
 		buffer_flush();
 
 		clear_input_buffer();
-	}
 
-	printf("Insert the medicine name: ");
-	buffer_flush();
-
-	while (scanf_s("%s", name, 256) != 1) {
-		printf("Invalid input. Please enter a valid string value for the medicine name: ");
+		// Clear the input field (delete any leftover characters).
+		printf("\033[%d;%dH%*s", current_line, id_input_col, screen_w - id_input_col, "");
 		buffer_flush();
 
-		clear_input_buffer();
+		// Wait until a key is pressed (to indicate the user is trying again)
+		while (!_kbhit()) { Sleep(10); }
+		_getch(); // Consume the key
+
+		// Clear the error message line.
+		printf("\033[%d;5H%*s", current_line + 1, screen_w - 5, "");
+		// Reposition cursor to the input area.
+		printf("\033[%d;%dH", current_line, id_input_col);
+		buffer_flush();
 	}
 
-	printf("Insert the concentration: ");
+	// --- Medicine Name ---
+	current_line += 2;
+	printf("\033[%d;5H%s%s > %s Medicine Name: %s", current_line,
+		color_codes[bold_color], color_codes[green_color],
+		color_codes[base0_color], color_codes[base2_color]);
+	printf("\033[%d;%dH", current_line, name_input_col);
 	buffer_flush();
 
-	while (scanf_s("%f", &concentration) != 1) {
-		printf("Invalid input. Please enter a valid float value for the concentration: ");
+	while (scanf_s("%255s", name, (unsigned)_countof(name)) != 1)
+	{
+		printf("\033[%d;5H%s%s Invalid Name! Please enter a valid string: %s",
+			current_line + 1, color_codes[bold_color],
+			color_codes[red_color], color_codes[base2_color]);
+		buffer_flush();
+		clear_input_buffer();
+
+		// Clear leftover input characters.
+		printf("\033[%d;%dH%*s", current_line, name_input_col, screen_w - name_input_col, "");
 		buffer_flush();
 
-		clear_input_buffer();
+		while (!_kbhit()) { Sleep(10); }
+		_getch();
+
+		printf("\033[%d;5H%*s", current_line + 1, screen_w - 5, "");
+		printf("\033[%d;%dH", current_line, name_input_col);
+		buffer_flush();
 	}
 
-	printf("Insert the available quantity: ");
+	// --- Concentration ---
+	current_line += 2;
+	printf("\033[%d;5H%s%s > %s Concentration: %s", current_line,
+		color_codes[bold_color], color_codes[green_color],
+		color_codes[base0_color], color_codes[base2_color]);
+	printf("\033[%d;%dH", current_line, conc_input_col);
 	buffer_flush();
 
-	while (scanf_s("%d", &available_quantity) != 1) {
-		printf("Invalid input. Please enter a valid integer value for the available quantity: ");
+	while (scanf_s("%f", &concentration) != 1)
+	{
+		printf("\033[%d;5H%s%s Invalid Concentration! Please enter a valid float: %s",
+			current_line + 1, color_codes[bold_color],
+			color_codes[red_color], color_codes[base2_color]);
+		buffer_flush();
+		clear_input_buffer();
+
+		// Clear leftover input characters.
+		printf("\033[%d;%dH%*s", current_line, conc_input_col, screen_w - conc_input_col, "");
 		buffer_flush();
 
-		clear_input_buffer();
+		while (!_kbhit()) { Sleep(10); }
+		_getch();
+
+		printf("\033[%d;5H%*s", current_line + 1, screen_w - 5, "");
+		printf("\033[%d;%dH", current_line, conc_input_col);
+		buffer_flush();
 	}
 
+	// --- Available Quantity ---
+	current_line += 2;
+	printf("\033[%d;5H%s%s > %s Available Quantity: %s", current_line,
+		color_codes[bold_color], color_codes[green_color],
+		color_codes[base0_color], color_codes[base2_color]);
+	printf("\033[%d;%dH", current_line, quant_input_col + 4);
+	buffer_flush();
+
+	while (scanf_s("%d", &available_quantity) != 1)
+	{
+		printf("\033[%d;5H%s%s Invalid Quantity! Please enter a valid integer: %s",
+			current_line + 1, color_codes[bold_color],
+			color_codes[red_color], color_codes[base2_color]);
+		buffer_flush();
+		clear_input_buffer();
+
+		// Clear leftover input characters.
+		printf("\033[%d;%dH%*s", current_line, quant_input_col, screen_w - quant_input_col, "");
+		buffer_flush();
+
+		while (!_kbhit()) { Sleep(10); }
+		_getch();
+
+		printf("\033[%d;5H%*s", current_line + 1, screen_w - 5, "");
+		printf("\033[%d;%dH", current_line, quant_input_col);
+		buffer_flush();
+	}
+
+	// Restore base background color and create the medicine record.
+	printf("%s", color_codes[base03_color]);
 	const medicine med_unit = create_medicine(id, name, concentration, available_quantity);
 	return med_unit;
 }
@@ -672,23 +871,102 @@ void filter_medicines_first_letter_ui(const struct medicine_list* list)
 	while (scanf_s("%c", &letter) != 1) {
 		printf("Invalid input. Please enter a valid character value for the medicine letter: ");
 		buffer_flush();
-
-		clear_input_buffer();
 	}
 
 	const medicine_list filtered_list = filter_medicines_by_name(list, letter);
-	display_medicines_ui(&filtered_list);
-}
 
-const char* menu_options[NUM_OPTIONS] = {
-	" Add New Medicine",
-	" Update Existing Stock",
-	" Delete Medicine Stock",
-	" Display Sorted Inventory",
-	" Filter Medicines",
-	" List All Medicines",
-	" Exit Application"
-};
+	SetConsoleOutputCP(65001);
+	clear_screen();
+	printf("%s", color_codes[base03_color]);
+
+	// Define margins and calculate available width
+	const int left_margin = 5;
+	const int right_margin = 5;
+	int screen_w = get_screen_width();
+	// The table (and header frame) will span the available width:
+	int header_width = screen_w - left_margin - right_margin;
+
+	// Draw header frame with title, starting at column left_margin.
+	printf("\033[3;%dH%s╔", left_margin, color_codes[frame_color_code]);
+	for (int i = 0; i < header_width - 2; i++)
+		printf("═");
+	printf("╗\033[4;%dH║%*s║\033[5;%dH╚", left_margin, header_width - 2, "", left_margin);
+	for (int i = 0; i < header_width - 2; i++)
+		printf("═");
+	printf("╝");
+
+	// Center the title inside the header frame.
+	const char* title = "DISPLAY ALL MEDICINES BY FIRST LETTER CRITERION";
+	int title_pad = (header_width - (int)strlen(title)) / 2;
+	printf("\033[4;%dH%s%s%s%s", left_margin + title_pad,
+		color_codes[bold_color], color_codes[cyan_color],
+		title, color_codes[base03_color]);
+	buffer_flush();
+
+	// Calculate dynamic column widths.
+	// The total inner width is the header_width minus the 2 outer borders and 3 inner dividers.
+	int total_inner_width = header_width - 5; // 2 + 3 = 5 extra characters
+	// Set proportions for the four columns:
+	int id_width = (int)(total_inner_width * 0.1); // 10% for ID
+	int name_width = (int)(total_inner_width * 0.5); // 50% for Name
+	int conc_width = (int)(total_inner_width * 0.2); // 20% for Concentration
+	int quant_width = total_inner_width - (id_width + name_width + conc_width); // Remainder for Quantity
+
+	// Table starting position is row 7, column left_margin.
+	const int table_start_line = 7;
+	printf("\033[%d;%dH", table_start_line, left_margin);
+
+	// Print the top border of the table.
+	printf("╔");
+	for (int i = 0; i < id_width; i++) printf("═");
+	printf("╦");
+	for (int i = 0; i < name_width; i++) printf("═");
+	printf("╦");
+	for (int i = 0; i < conc_width; i++) printf("═");
+	printf("╦");
+	for (int i = 0; i < quant_width; i++) printf("═");
+	printf("╗\n\033[%dG", left_margin);
+
+	// Header row with one-space padding on each side.
+	// The field width for content is (column width - 2) to account for the left/right padding.
+	printf("║ %-*s ", id_width - 2, "ID");
+	printf("│ %-*s ", name_width - 2, "Name");
+	printf("│ %-*s ", conc_width - 2, "Concentration");
+	printf("│ %-*s ║\n\033[%dG", quant_width - 2, "Qty", left_margin);
+
+	// Divider between header and data rows.
+	printf("╠");
+	for (int i = 0; i < id_width; i++) printf("═");
+	printf("╬");
+	for (int i = 0; i < name_width; i++) printf("═");
+	printf("╬");
+	for (int i = 0; i < conc_width; i++) printf("═");
+	printf("╬");
+	for (int i = 0; i < quant_width; i++) printf("═");
+	printf("╣\n\033[%dG", left_margin);
+
+	// Loop through the medicine list and print each record in a table row with padding.
+	for (int i = 0; i < filtered_list.index; i++)
+	{
+		printf("║ %-*d ", id_width - 2, filtered_list.array[i].id);
+		printf("│ %-*s ", name_width - 2, filtered_list.array[i].name);
+		printf("│ %-*.2f ", conc_width - 2, filtered_list.array[i].concentration);
+		printf("│ %-*d ║\n\033[%dG", quant_width - 2, filtered_list.array[i].available_quantity, left_margin);
+	}
+
+	// Print the bottom border of the table.
+	printf("╚");
+	for (int i = 0; i < id_width; i++) printf("═");
+	printf("╩");
+	for (int i = 0; i < name_width; i++) printf("═");
+	printf("╩");
+	for (int i = 0; i < conc_width; i++) printf("═");
+	printf("╩");
+	for (int i = 0; i < quant_width; i++) printf("═");
+	printf("╝\n");
+
+	buffer_flush();
+}
 
 void clear_screen(void) {
 	const HANDLE h_console = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -699,18 +977,17 @@ void clear_screen(void) {
 	if (!GetConsoleScreenBufferInfo(h_console, &cons_scr_buff_info))
 		return;
 
-	DWORD consoleSize = cons_scr_buff_info.dwSize.X * cons_scr_buff_info.dwSize.Y;
-	DWORD charsWritten;
-	COORD homeCoords = { 0, 0 };
+	const DWORD console_size = cons_scr_buff_info.dwSize.X * cons_scr_buff_info.dwSize.Y;
+	DWORD chars_written;
+	const COORD home_coords = { 0, 0 };
 
-	FillConsoleOutputCharacter(h_console, ' ', consoleSize, homeCoords, &charsWritten);
+	FillConsoleOutputCharacter(h_console, ' ', console_size, home_coords, &chars_written);
 
-	FillConsoleOutputAttribute(h_console, cons_scr_buff_info.wAttributes, consoleSize, homeCoords, &charsWritten);
+	FillConsoleOutputAttribute(h_console, cons_scr_buff_info.wAttributes, console_size, home_coords, &chars_written);
 
-	SetConsoleCursorPosition(h_console, homeCoords);
+	SetConsoleCursorPosition(h_console, home_coords);
 }
 
-// ---------- BASIC CONSOLE SETUP ----------
 void enable_ansi(void) {
 	const HANDLE h_out = GetStdHandle(STD_OUTPUT_HANDLE);
 	DWORD dw_mode = 0;
@@ -734,7 +1011,6 @@ static void set_full_screen(void) {
 		rect.right - rect.left + 1,
 		rect.bottom - rect.top + 1, TRUE);
 
-	// Resize the screen buffer to match window size
 	HANDLE h_console = GetStdHandle(STD_OUTPUT_HANDLE);
 	CONSOLE_SCREEN_BUFFER_INFO cons_scr_buff_info;
 	GetConsoleScreenBufferInfo(h_console, &cons_scr_buff_info);
@@ -761,7 +1037,7 @@ void decorative_frame(void) {
 	const int screen_w = get_screen_width();
 	const int screen_h = get_screen_height();
 	const int frame_width = (int)(screen_w * 0.50);
-	const int frame_height = NUM_OPTIONS * 2 + 2;
+	const int frame_height = num_options * 2 + 2;
 	const int start_x = 3;
 	const int start_y = 3;
 
@@ -788,7 +1064,6 @@ void decorative_frame(void) {
 }
 
 void print_menu(const int highlight) {
-	// Use base03_color from the array
 	printf("%s", color_codes[base03_color]);
 	decorative_frame();
 
@@ -800,11 +1075,8 @@ void print_menu(const int highlight) {
 	const int content_width = frame_width - 2;
 
 	printf("\033[%d;%dH", start_y + 1, start_x + text_padding + 1);
-	for (int i = 0; i < NUM_OPTIONS; i++) {
+	for (int i = 0; i <	num_options; i++) {
 		if (highlight == i + 1) {
-			// Replace macros with corresponding array entries:
-			// Instead of: color_codes[highlight_bg_color], color_codes[bold], YELLOW, BASE2
-			// Use: color_codes[highlight_bg_color], color_codes[bold_color], color_codes[yellow_color], color_codes[base2_color]
 			printf("%s%s%s> %s%s",
 				color_codes[highlight_bg_color],
 				color_codes[bold_color],
@@ -813,7 +1085,6 @@ void print_menu(const int highlight) {
 				menu_options[i]);
 		}
 		else {
-			// Similarly, replace BASE03, BASE0, and BASE1 with array entries
 			printf("%s%s  %s%s",
 				color_codes[base03_color],
 				color_codes[base0_color],
@@ -827,28 +1098,27 @@ void print_menu(const int highlight) {
 		for (int j = 0; j < content_width; j++) {
 			printf("─");
 		}
-		if (i < NUM_OPTIONS - 1) {
+		if (i < num_options - 1) {
 			printf("\033[%d;%dH", start_y + 1 + (i + 1) * 2, start_x + text_padding + 1);
 		}
 	}
 	printf("\033[%d;%dH%s%s[CONTROLS] ↑/↓: Navigate | Enter: Select",
-		start_y + (NUM_OPTIONS * 2) + 1,
+		start_y + (num_options * 2) + 1,
 		start_x + text_padding,
 		color_codes[base0_color],
 		color_codes[bold_color]);
 	buffer_flush();
 }
 
-// ---------- CURSOR / INPUT HELPERS ----------
 #define HIDE_CURSOR "\033[?25l"
 
 void enable_raw_console_mode(void) {
-	HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
+	const HANDLE h_input = GetStdHandle(STD_INPUT_HANDLE);
 	DWORD mode;
-	GetConsoleMode(hInput, &mode);
+	GetConsoleMode(h_input, &mode);
 	mode &= ~ENABLE_QUICK_EDIT_MODE;
 	mode &= ~ENABLE_MOUSE_INPUT;
-	SetConsoleMode(hInput, mode);
+	SetConsoleMode(h_input, mode);
 }
 
 void hide_mouse_cursor(void) {
@@ -856,7 +1126,7 @@ void hide_mouse_cursor(void) {
 	buffer_flush();
 }
 
-void update_menu(int old_highlight, const int new_highlight) {
+void update_menu(const int old_highlight, const int new_highlight) {
 	const int start_y = 3 + 1;
 	const int line_spacing = 2;
 	const int option_col = 3 + 2 + 1;
@@ -902,19 +1172,18 @@ void update_menu(int old_highlight, const int new_highlight) {
 	buffer_flush();
 }
 
-
-// ---------- INPUT HANDLING ----------
 bool key_pressed(const int virtKey) {
 	return GetAsyncKeyState(virtKey) & 0x8000;
 }
 
-// ---------- SPLASH SCREEN ----------
 void display_splash_screen(void) {
-	printf("%s\033[2J\033[H", color_codes[base03_color]);
 	buffer_flush();
 
 	const int width = get_screen_width();
 	const int height = get_screen_height();
+
+	printf("%s\033[2J\033[H", color_codes[base03_color]);
+	buffer_flush();
 
 	const char* ascii_art[] = {
 		"______  _                                   _____ ______   ___   _____  _   __",
@@ -925,18 +1194,18 @@ void display_splash_screen(void) {
 		"\\_|    |_| |_| \\__,_||_|   |_| |_| |_| \\__,_|\\_/  \\_| \\_|\\_| |_/ \\____/\\_| \\_/"
 	};
 
-	int total_art_height = 6 + 2;
-	int start_y = (height - total_art_height) / 2;
+	const int total_art_height = 6 + 2;
+	const int start_y = (height - total_art_height) / 2;
 
 	for (int i = 0; i < 6; i++) {
-		int padding = (width - (int)strlen(ascii_art[i])) / 2;
+		const int padding = (width - (int)strlen(ascii_art[i])) / 2;
 		printf("\033[%d;%dH%s%s%s",
 			start_y + i, padding,
 			color_codes[cyan_color], ascii_art[i], color_codes[base03_color]);
 	}
 
 	const char* subtitle = "Pharmaceutical Management System";
-	int subtitle_padding = (width - (int)strlen(subtitle)) / 2;
+	const int subtitle_padding = (width - (int)strlen(subtitle)) / 2;
 	printf("\033[%d;%dH%s%s%s",
 		start_y + 7, subtitle_padding,
 		color_codes[base1_color], subtitle, color_codes[base03_color]);
@@ -949,6 +1218,234 @@ void display_splash_screen(void) {
 	Sleep(3000);
 
 	clear_screen();
+}
+
+static void redraw_sort_submenu(const int sub_current_option, const int sub_num_options,
+	const char* sort_options[],
+	const int start_x, const int start_y, const int menu_width) {
+	clear_screen();
+	printf("%s", color_codes[base03_color]);
+
+	printf("\033[%d;%dH%s╔", start_y - 1, start_x, color_codes[frame_color_code]);
+	for (int i = 0; i < menu_width - 1; i++) {
+		printf("═");
+	}
+	printf("╗");
+
+	printf("\033[%d;%dH%s║            SORTING OPTIONS            ║", start_y, start_x, color_codes[frame_color_code]);
+
+	for (int i = 0; i < sub_num_options; i++) {
+		printf("\033[%d;%dH", start_y + 2 + i, start_x);
+		if (i == sub_current_option - 1) {
+			printf("%s%s> %s%-*s%s",
+				color_codes[highlight_bg_color],
+				color_codes[yellow_color],
+				color_codes[base2_color],
+				menu_width - 4, sort_options[i],
+				color_codes[base03_color]);
+		}
+		else {
+			printf("%s  %s%-*s%s",
+				color_codes[base03_color],
+				color_codes[base1_color],
+				menu_width - 4, sort_options[i],
+				color_codes[base03_color]);
+		}
+	}
+	buffer_flush();
+}
+
+static void redraw_filter_submenu(const int sub_current_option, const int sub_num_options,
+	const char* sort_options[],
+	const int start_x, const int start_y, const int menu_width) {
+	clear_screen();
+	printf("%s", color_codes[base03_color]);
+
+	printf("\033[%d;%dH%s╔", start_y - 1, start_x, color_codes[frame_color_code]);
+	for (int i = 0; i < menu_width - 2; i++) {
+		printf("═");
+	}
+	printf("╗");
+
+	printf("\033[%d;%dH%s║             FILTERING OPTIONS             ║", start_y, start_x, color_codes[frame_color_code]);
+
+	for (int i = 0; i < sub_num_options; i++) {
+		printf("\033[%d;%dH", start_y + 2 + i, start_x);
+		if (i == sub_current_option - 1) {
+
+			printf("%s%s > %s%-*s%s",
+				color_codes[highlight_bg_color],
+				color_codes[yellow_color],
+				color_codes[base2_color],
+				menu_width - 4, sort_options[i],
+				color_codes[base03_color]);
+		}
+		else {
+			printf("%s  %s%-*s%s",
+				color_codes[base03_color],
+				color_codes[base1_color],
+				menu_width - 4, sort_options[i],
+				color_codes[base03_color]);
+		}
+	}
+	buffer_flush();
+}
+
+static void clear_input_buffer_ii(void) {
+	while (_kbhit()) {
+		_getch();
+	}
+}
+
+void interactive_sort_submenu(const struct medicine_list* list) {
+	int sub_current_option = 1;
+	const int sub_num_options = 3;
+	const char* sort_options[] = {
+		"Sort by Quantity",
+		"Sort by Name",
+		"Return to Main Menu"
+	};
+
+	clear_input_buffer_ii();
+	while (key_pressed(VK_RETURN)) {
+		Sleep(10);
+	}
+
+	const int screen_w = get_screen_width();
+	const int screen_h = get_screen_height();
+	const int menu_width = 40;
+	const int start_x = (screen_w - menu_width) / 2;
+	const int start_y = (screen_h - sub_num_options) / 2;
+
+	redraw_sort_submenu(sub_current_option, sub_num_options, sort_options, start_x, start_y, menu_width);
+
+	while (true) {
+		clear_input_buffer_ii();
+
+		if (key_pressed(VK_UP)) {
+			sub_current_option = (sub_current_option > 1) ? sub_current_option - 1 : sub_num_options;
+			redraw_sort_submenu(sub_current_option, sub_num_options, sort_options,
+				start_x, start_y, menu_width);
+			Sleep(100);
+		}
+		else if (key_pressed(VK_DOWN)) {
+			sub_current_option = (sub_current_option % sub_num_options) + 1;
+			redraw_sort_submenu(sub_current_option, sub_num_options, sort_options,
+				start_x, start_y, menu_width);
+			Sleep(100);
+		}
+		else if (key_pressed(VK_RETURN)) {
+			while (key_pressed(VK_RETURN)) {
+				Sleep(10);
+			}
+			clear_input_buffer_ii();
+
+			switch (sub_current_option) {
+			case 1:
+				clear_screen();
+				printf("%s", color_codes[base03_color]);
+				buffer_flush();
+				filter_medicines_stock_ui(list);
+				buffer_flush();
+				break;
+			case 2:
+				clear_screen();
+				printf("%s", color_codes[base03_color]);
+				buffer_flush();
+				filter_medicines_first_letter_ui(list);
+				break;
+			case 3:
+				return;
+			default:
+				break;
+			}
+
+			buffer_flush();
+			_getch();
+			Sleep(100);
+			clear_input_buffer_ii();
+			redraw_sort_submenu(sub_current_option, sub_num_options, sort_options,
+				start_x, start_y, menu_width);
+		}
+		Sleep(10);
+	}
+}
+
+void interactive_filter_submenu(const struct medicine_list* list) {
+	int sub_current_option = 1;
+	const int sub_num_options = 3;
+	const char* filter_options[] = {
+		"Filter by Stock Quantity",
+		"Filter by First Letter",
+		"Return to Main Menu"
+	};
+
+	clear_input_buffer_ii();
+	while (key_pressed(VK_RETURN)) {
+		Sleep(10);
+	}
+
+	const int screen_w = get_screen_width();
+	const int screen_h = get_screen_height();
+	const int menu_width = 45;
+	const int start_x = (screen_w - menu_width) / 2;
+	const int start_y = (screen_h - sub_num_options) / 2;
+
+	redraw_filter_submenu(sub_current_option, sub_num_options, filter_options,
+		start_x, start_y, menu_width);
+
+	while (true) {
+		clear_input_buffer_ii();
+
+		if (key_pressed(VK_UP)) {
+			sub_current_option = (sub_current_option > 1) ? sub_current_option - 1 : sub_num_options;
+			redraw_filter_submenu(sub_current_option, sub_num_options, filter_options,
+				start_x, start_y, menu_width);
+			Sleep(100);
+		}
+		else if (key_pressed(VK_DOWN)) {
+			sub_current_option = (sub_current_option % sub_num_options) + 1;
+			redraw_filter_submenu(sub_current_option, sub_num_options, filter_options,
+				start_x, start_y, menu_width);
+			Sleep(100);
+		}
+		else if (key_pressed(VK_RETURN)) {
+			while (key_pressed(VK_RETURN)) {
+				Sleep(10);
+			}
+			clear_input_buffer_ii();
+
+			switch (sub_current_option) {
+			case 1:
+				clear_screen();
+				printf("%s", color_codes[base03_color]);
+				buffer_flush();
+				filter_medicines_stock_ui(list);
+				buffer_flush();
+				break;
+			case 2:
+				clear_screen();
+				printf("%s", color_codes[base03_color]);
+				buffer_flush();
+				filter_medicines_first_letter_ui(list);
+				break;
+			case 3:
+				return;
+			default:
+				break;
+			}
+
+			buffer_flush();
+			_getch();
+
+			Sleep(100);  
+			clear_input_buffer_ii();
+			redraw_filter_submenu(sub_current_option, sub_num_options, filter_options,
+				start_x, start_y, menu_width);
+		}
+
+		Sleep(10);
+	}
 }
 
 void menu_implemented(struct medicine_list* list)
@@ -981,9 +1478,9 @@ void menu_implemented(struct medicine_list* list)
 	hide_mouse_cursor();
 
 	printf("%s", color_codes[base03_color]);
+	decorative_frame();
 	display_splash_screen();
 
-	decorative_frame();
 	print_menu(1);
 
 	int current_option = 1;
@@ -993,14 +1490,14 @@ void menu_implemented(struct medicine_list* list)
 		if (key_pressed(VK_UP)) {
 			current_option--;
 			if (current_option < 1)
-				current_option = NUM_OPTIONS;
+				current_option = num_options;
 			update_menu(prev_option, current_option);
 			prev_option = current_option;
 			Sleep(100);
 		}
 		else if (key_pressed(VK_DOWN)) {
 			current_option++;
-			if (current_option > NUM_OPTIONS)
+			if (current_option > num_options)
 				current_option = 1;
 			update_menu(prev_option, current_option);
 			prev_option = current_option;
@@ -1022,56 +1519,10 @@ void menu_implemented(struct medicine_list* list)
 					delete_medicine_stock_ui(list);
 					break;
 				case 4:
-					while (true) {
-
-						option_4_submenu();
-						const char sub_option = select_option_4();
-
-						if (sub_option == '3') {
-							printf("Exiting the submenu...\n");
-							break;
-						}
-
-						switch (sub_option)
-						{
-						case '1':
-							sort_medicines_quantity_ui(list);
-							break;
-
-						case '2':
-							sort_medicines_name_ui(list);
-							break;
-
-						default:
-							break;
-						}
-					}
+					interactive_sort_submenu(list);
 					break;
 				case 5:
-					while (true) {
-
-						option_5_submenu();
-						const char sub_option = select_option_5();
-
-						if (sub_option == '3') {
-							printf("Exiting the submenu...\n");
-							break;
-						}
-
-						switch (sub_option)
-						{
-						case '1':
-							filter_medicines_stock_ui(list);
-							break;
-
-						case '2':
-							filter_medicines_first_letter_ui(list);
-							break;
-
-						default:
-							break;
-						}
-					}
+					interactive_filter_submenu(list);
 					break;
 				case 6:
 					display_medicines_ui(list);
@@ -1087,7 +1538,7 @@ void menu_implemented(struct medicine_list* list)
 
 			_getch();
 
-			while (_kbhit()) { _getch(); }
+			clear_input_buffer_ii();
 
 			if (current_option == 7)
 				_exit(0);
